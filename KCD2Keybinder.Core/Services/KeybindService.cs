@@ -28,18 +28,17 @@ namespace KDC2Keybinder.Core.Services
 		public void LoadVanillaPak(string pakFileName)
 		{
 			var pakPath = Path.Combine(dataRoot, pakFileName);
+			if (!File.Exists(pakPath))
+				throw new FileNotFoundException("Vanilla .pak file not found.", pakPath);
 			using var reader = new PakReader(pakPath);
 
-			// defaultProfile.xml komplett halten
 			var defaultProfileXml = reader.ReadFile("Libs/Config/defaultProfile.xml");
 			if (!string.IsNullOrEmpty(defaultProfileXml))
 			{
 				vanillaDefaultProfileDoc = XDocument.Parse(defaultProfileXml);
-				// Optional: bestehende ActionMaps in Dictionary für schnelle Suche extrahieren
 				ParseDefaultProfile(defaultProfileXml, vanillaActionMaps);
 			}
 
-			// keybindSuperactions.xml komplett halten
 			var keybindXml = reader.ReadFile("Libs/Config/keybindSuperactions.xml");
 			if (!string.IsNullOrEmpty(keybindXml))
 			{
@@ -50,62 +49,71 @@ namespace KDC2Keybinder.Core.Services
 
 		private void ParseDefaultProfile(string xmlContent, Dictionary<string, ActionMap> target)
 		{
-			var doc = XDocument.Parse(xmlContent);
-			foreach (var mapEl in doc.Root.Elements("actionmap"))
+			try
 			{
-				var map = new ActionMap
+				var doc = XDocument.Parse(xmlContent);
+				foreach (var mapEl in doc.Root.Elements("actionmap"))
 				{
-					Name = mapEl.Attribute("name")?.Value ?? "",
-					Priority = mapEl.Attribute("priority")?.Value ?? "default",
-					Exclusivity = mapEl.Attribute("exclusivity")?.Value ?? "0"
-				};
-
-				foreach (var actionEl in mapEl.Elements("action"))
-				{
-					var action = new Action
+					var map = new ActionMap
 					{
-						name = actionEl.Attribute("name")?.Value,
-						map = actionEl.Attribute("map")?.Value,
-						onPress = actionEl.Attribute("onPress")?.Value,
-						onRelease = actionEl.Attribute("onRelease")?.Value,
-						onHold = actionEl.Attribute("onHold")?.Value,
-						retriggerable = actionEl.Attribute("retriggerable")?.Value,
-						holdTriggerDelay = actionEl.Attribute("holdTriggerDelay")?.Value,
-						holdRepeatDelay = actionEl.Attribute("holdRepeatDelay")?.Value
+						Name = mapEl.Attribute("name")?.Value ?? "",
+						Priority = mapEl.Attribute("priority")?.Value ?? "default",
+						Exclusivity = mapEl.Attribute("exclusivity")?.Value ?? "0"
 					};
-					map.Actions.Add(action);
-				}
 
-				target[map.Name] = map;
+					foreach (var actionEl in mapEl.Elements("action"))
+					{
+						var action = new Action
+						{
+							name = actionEl.Attribute("name")?.Value ?? "",
+							map = actionEl.Attribute("map")?.Value ?? "",
+							onPress = actionEl.Attribute("onPress")?.Value ?? "",
+							onRelease = actionEl.Attribute("onRelease")?.Value ?? "",
+							onHold = actionEl.Attribute("onHold")?.Value ?? "",
+							retriggerable = actionEl.Attribute("retriggerable")?.Value ?? "",
+							holdTriggerDelay = actionEl.Attribute("holdTriggerDelay")?.Value ?? "",
+							holdRepeatDelay = actionEl.Attribute("holdRepeatDelay")?.Value ?? ""
+						};
+						map.Actions.Add(action);
+					}
+
+					target[map.Name] = map;
+				}
+			}
+			catch (Exception)
+			{
+
+				throw;
 			}
 		}
 
 		private void ParseSuperactions(string xmlContent, Dictionary<string, Superaction> target)
 		{
 			var doc = XDocument.Parse(xmlContent);
+			if (doc.Root == null) return;
 			foreach (var saEl in doc.Root.Elements("superaction"))
 			{
 				var sa = new Superaction
 				{
-					Name = saEl.Attribute("name")?.Value,
-					UiGroup = saEl.Attribute("ui_group")?.Value,
-					UiName = saEl.Attribute("ui_name")?.Value,
-					UiTooltip = saEl.Attribute("ui_tooltip")?.Value,
-					Keyboard = saEl.Attribute("keyboard")?.Value
+					Name = saEl.Attribute("name")?.Value ?? "",
+					UiGroup = saEl.Attribute("ui_group")?.Value ?? "",
+					UiName = saEl.Attribute("ui_name")?.Value ?? "",
+					UiTooltip = saEl.Attribute("ui_tooltip")?.Value ?? "",
+					Keyboard = saEl.Attribute("keyboard")?.Value ?? ""
 				};
 
 				foreach (var act in saEl.Elements("action"))
 				{
 					sa.Actions.Add(new Action
 					{
-						name = act.Attribute("name")?.Value,
-						map = act.Attribute("map")?.Value,
-						onPress = act.Attribute("onPress")?.Value,
-						onRelease = act.Attribute("onRelease")?.Value,
-						onHold = act.Attribute("onHold")?.Value,
-						retriggerable = act.Attribute("retriggerable")?.Value,
-						holdTriggerDelay = act.Attribute("holdTriggerDelay")?.Value,
-						holdRepeatDelay = act.Attribute("holdRepeatDelay")?.Value
+						name = act.Attribute("name")?.Value ?? "",
+						map = act.Attribute("map")?.Value ?? "",
+						onPress = act.Attribute("onPress")?.Value ?? "",
+						onRelease = act.Attribute("onRelease")?.Value ?? "",
+						onHold = act.Attribute("onHold")?.Value ?? "",
+						retriggerable = act.Attribute("retriggerable")?.Value ?? "",
+						holdTriggerDelay = act.Attribute("holdTriggerDelay")?.Value ?? "",
+						holdRepeatDelay = act.Attribute("holdRepeatDelay")?.Value ?? ""
 					});
 				}
 
@@ -113,8 +121,8 @@ namespace KDC2Keybinder.Core.Services
 				{
 					sa.Controls.Add(new Control
 					{
-						Input = control.Attribute("input")?.Value,
-						Controller = control.Attribute("controller")?.Value
+						Input = control.Attribute("input")?.Value ?? "",
+						Controller = control.Attribute("controller")?.Value ?? ""
 					});
 				}
 
@@ -126,21 +134,18 @@ namespace KDC2Keybinder.Core.Services
 
 		public void MergeModActionMaps(List<Keybind> modKeybinds)
 		{
-			// Alle existierenden ModIds ermitteln
 			var existingModIds = Directory.GetDirectories(modsRoot)
 										  .Select(d => Path.GetFileName(d))
 										  .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-			// Alte Actions von nicht mehr existierenden Mods entfernen
 			foreach (var map in vanillaActionMaps.Values)
 			{
 				map.Actions.RemoveAll(a => !string.IsNullOrWhiteSpace(a.map) && !existingModIds.Contains(a.map));
 			}
 
-			// Mod-Keybinds in die passende ActionMap einfügen oder neue ActionMaps erzeugen
 			foreach (var kb in modKeybinds)
 			{
-				if (string.IsNullOrWhiteSpace(kb.Map)) kb.Map = "movement"; // default fallback
+				if (string.IsNullOrWhiteSpace(kb.Map)) kb.Map = "movement";
 
 				if (!vanillaActionMaps.TryGetValue(kb.Map, out var map))
 				{
@@ -153,7 +158,6 @@ namespace KDC2Keybinder.Core.Services
 					vanillaActionMaps[kb.Map] = map;
 				}
 
-				// Prüfen, ob Aktion schon existiert
 				if (!map.Actions.Any(a => a.name == kb.Name))
 				{
 					map.Actions.Add(new Action
@@ -162,7 +166,6 @@ namespace KDC2Keybinder.Core.Services
 						map = kb.Map,
 						onPress = "1",
 						onRelease = "1"
-						// Optional: andere Standardattribute setzen
 					});
 				}
 			}
@@ -173,26 +176,30 @@ namespace KDC2Keybinder.Core.Services
 		{
 			Directory.CreateDirectory(outputDir);
 
-			// --- Superactions ---
 			var saDoc = vanillaSuperactionsDoc ?? new XDocument(new XElement("keybinds"));
 
-			// Alle ModIds sammeln
 			var modIds = keybinds.Select(kb => kb.UiGroup ?? "unknown").Distinct();
 
-			// ui_group für jede ModId hinzufügen, falls noch nicht vorhanden
+			var existingGroups = saDoc.Root.Elements("ui_group").ToList();
+
+			var newGroups = new List<XElement>();
 			foreach (var modId in modIds)
 			{
-				if (!saDoc.Root.Elements("ui_group").Any(x => (string)x.Attribute("name") == modId))
+				if (!existingGroups.Any(x => (string)x.Attribute("name") == modId))
 				{
 					var modGroup = new XElement("ui_group",
 						new XAttribute("name", modId),
 						new XAttribute("ui_label", $"ui_keybinds_group_{modId}")
 					);
-					saDoc.Root.Add(modGroup);
+					newGroups.Add(modGroup);
 				}
 			}
 
-			// Superactions ergänzen
+			newGroups = newGroups.OrderBy(x => (string)x.Attribute("name")).ToList();
+
+			var reorderedElements = newGroups.Concat(saDoc.Root.Elements()).ToList();
+			saDoc.Root.ReplaceAll(reorderedElements);
+
 			foreach (var kb in keybinds)
 			{
 				if (saDoc.Root.Elements("superaction").Any(x => (string)x.Attribute("name") == kb.Name))
@@ -216,13 +223,12 @@ namespace KDC2Keybinder.Core.Services
 				saDoc.Root.Add(saEl);
 			}
 
-			// --- DefaultProfile ---
 			var dpDoc = vanillaDefaultProfileDoc ?? new XDocument(new XElement("defaultProfile"));
 
 			foreach (var kb in keybinds)
 			{
 				var mapName = kb.Map ?? "open_menu";
-
+				if (dpDoc.Root is null) continue;
 				var mapEl = dpDoc.Root.Elements("actionmap")
 					.FirstOrDefault(x => (string)x.Attribute("name") == mapName);
 
@@ -237,7 +243,6 @@ namespace KDC2Keybinder.Core.Services
 					dpDoc.Root.Add(mapEl);
 				}
 
-				// Prüfen, ob Action bereits existiert
 				if (mapEl.Elements("action").Any(x => (string)x.Attribute("name") == kb.Name))
 					continue;
 
@@ -248,7 +253,6 @@ namespace KDC2Keybinder.Core.Services
 					new XAttribute("keyboard", "_keybinds_ref_")
 				);
 
-				// _ctrl Varianten
 				if (kb.Name.EndsWith("_ctrl"))
 				{
 					actionEl.SetAttributeValue("holdTriggerDelay", "0.5");
@@ -262,14 +266,12 @@ namespace KDC2Keybinder.Core.Services
 				mapEl.Add(actionEl);
 			}
 
-			// --- Speichern ---
 			var saPath = Path.Combine(outputDir, "keybindSuperactions.xml");
 			saDoc.Save(saPath);
 
 			var dpPath = Path.Combine(outputDir, "defaultProfile.xml");
 			dpDoc.Save(dpPath);
 		}
-
 
 
 
@@ -287,13 +289,17 @@ namespace KDC2Keybinder.Core.Services
 			{
 				var modName = Path.GetFileName(modDir);
 				if (modName.StartsWith("zz", StringComparison.OrdinalIgnoreCase))
-					continue; // generierte Mod überspringen
+					continue;
 
 				var manifest = Path.Combine(modDir, "mod.manifest");
 				if (!File.Exists(manifest)) continue;
 
 				var modId = GetModIdFromManifest(manifest);
-				var pakFile = Directory.GetFiles(Path.Combine(modDir, "Data"), "*.pak").FirstOrDefault();
+				var dataPath = Path.Combine(modDir, "Data");
+				if (!Directory.Exists(dataPath))
+					continue;
+
+				var pakFile = Directory.GetFiles(dataPath, "*.pak").FirstOrDefault();
 				if (pakFile == null) continue;
 
 				using var pakReader = new PakReader(pakFile);
@@ -327,15 +333,16 @@ namespace KDC2Keybinder.Core.Services
 		private void ParseModSuperactions(string xmlContent, string modId, List<Keybind> target)
 		{
 			var doc = XDocument.Parse(xmlContent);
+			if (doc.Root == null) return;
 			foreach (var saEl in doc.Root.Elements("superaction"))
 			{
 				var kb = new Keybind
 				{
-					Name = saEl.Attribute("name")?.Value,
+					Name = saEl.Attribute("name")?.Value ?? "",
 					UiGroup = modId,
-					UiName = saEl.Attribute("ui_name")?.Value,
-					Description = saEl.Attribute("ui_tooltip")?.Value,
-					Map = saEl.Elements("action").FirstOrDefault()?.Attribute("map")?.Value
+					UiName = saEl.Attribute("ui_name")?.Value ?? "",
+					Description = saEl.Attribute("ui_tooltip")?.Value ?? "",
+					Map = saEl.Elements("action").FirstOrDefault()?.Attribute("map")?.Value ?? ""
 				};
 
 				target.Add(kb);
@@ -344,6 +351,7 @@ namespace KDC2Keybinder.Core.Services
 
 		private IEnumerable<Keybind> ParseLuaBindings(string luaText, string modId)
 		{
+			if (string.IsNullOrWhiteSpace(luaText)) yield break;
 			var matches = Regex.Matches(luaText, @"---\s*@binding\s+(\w+)");
 			foreach (Match match in matches)
 			{

@@ -1,7 +1,4 @@
 ﻿using KDC2Keybinder.Core;
-using KDC2Keybinder.Core.Models;
-using KDC2Keybinder.Core.Utils;
-using Action = KDC2Keybinder.Core.Models.Action;
 
 namespace KCD2Keybinder
 {
@@ -14,8 +11,30 @@ namespace KCD2Keybinder
 			pakFolder = Path.GetFullPath(pakFolder);
 			string modFolder = Path.Combine(exeDir, "..", "..", "Mods");
 			modFolder = Path.GetFullPath(modFolder);
-			var manager = new KeybindManager(exeDir, pakFolder, modFolder);
+
+			string? outputModDir = GetOption(args, "-o", "--output");
+
+			if (!string.IsNullOrWhiteSpace(outputModDir))
+			{
+				outputModDir = Path.GetFullPath(outputModDir);
+			}
+
+			var manager = new KeybindManager(exeDir, pakFolder, modFolder, outputModDir);
 			manager.Generate();
+		}
+
+		static string? GetOption(string[] args, params string[] names)
+		{
+			for (int i = 0; i < args.Length; i++)
+			{
+				if (names.Contains(args[i], StringComparer.OrdinalIgnoreCase))
+				{
+					if (i + 1 < args.Length)
+						return args[i + 1];
+				}
+			}
+
+			return null;
 		}
 	}
 }

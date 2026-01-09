@@ -11,12 +11,14 @@ namespace KDC2Keybinder.Core
 		private readonly string gameDir;
 		private readonly string dataDir;
 		private readonly string modsDir;
+		private readonly string? outputModDir;
 
-		public KeybindManager(string gameDir, string dataDir, string modsDir)
+		public KeybindManager(string gameDir, string dataDir, string modsDir, string? outputModDir)
 		{
 			this.gameDir = gameDir;
 			this.dataDir = dataDir;
 			this.modsDir = modsDir;
+			this.outputModDir = outputModDir;
 		}
 
 		public void Generate()
@@ -28,7 +30,18 @@ namespace KDC2Keybinder.Core
 
 			keybindService.MergeModActionMaps(modKeybinds);
 			var modId = "keybinder";
-			var modFolder = Path.Combine(modsDir, "zz" + modId);
+
+			string modFolder;
+
+			if (!string.IsNullOrEmpty(outputModDir))
+			{
+				modFolder = Path.Combine(outputModDir, "zz" + modId);
+			}
+			else
+			{
+				modFolder = Path.Combine(modsDir, "zz" + modId);
+			}
+
 			var outputDir = Path.Combine(modFolder, "Data", "Libs", "Config");
 			Directory.CreateDirectory(outputDir);
 			keybindService.ExportKeybinds(outputDir, modKeybinds);
